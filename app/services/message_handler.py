@@ -473,8 +473,8 @@ class MessageHandler:
                     
                     checkin_count = len(checkins)
                     
-                    # 检查是否达标（9次有效打卡）
-                    is_qualified = checkin_count >= 9
+                    # 检查是否达标（7次有效打卡）
+                    is_qualified = checkin_count >= 7
                     
                     # 生成开发者的AI表扬语
                     praise = ""
@@ -533,7 +533,7 @@ class MessageHandler:
                 
                 # 添加达标情况说明
                 response_lines.append("\n🎯 达标情况：")
-                response_lines.append("- 达标要求：21天内完成9次有效打卡 + 实现自定目标")
+                response_lines.append("- 达标要求：21天内完成7次有效打卡 + 实现自定目标")
                 
                 if qualified_developers:
                     response_lines.append("\n🏆 本期达标开发者：")

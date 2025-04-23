@@ -26,7 +26,7 @@ def get_all_checkins(db: Session, signup_id: int) -> List[Checkin]:
     """获取用户所有的打卡记录"""
     return db.query(Checkin).filter(Checkin.signup_id == signup_id).order_by(Checkin.checkin_date).all()
 
-def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str, content: str, checkin_count: int, is_final: bool = False) -> str:
+def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str, content: str, checkin_count: int, is_final: bool = False, is_ranking: bool = False) -> str:
     """生成AI反馈，基于用户的所有打卡记录和目标"""
     # 获取所有历史打卡记录
     all_checkins = get_all_checkins(db, signup_id)
@@ -38,8 +38,33 @@ def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str,
             continue
         history += f"第{i}次打卡内容：{checkin.content}\n"
     
-    # 根据是否是最终总结调整提示词
-    if is_final:
+    # 根据不同场景调整提示词
+    if is_ranking:
+        prompt = f"""
+        用户 {nickname} 的学习情况：
+        
+        【报名目标】
+        {goals}
+        
+        【历史打卡记录】
+        {history}
+        
+        【最新打卡】（第{checkin_count}次）
+        {content}
+        
+        请生成一个简洁的项目进度总结（20字左右），要求：
+        1. 清晰说明用户目标的完成程度（已完成XX%/部分完成/刚起步）
+        2. 提及一项具体的进展或成就
+        3. 语气客观、中立
+        4. 不要包含鼓励性语言，纯粹描述事实
+        5. 不超过25个字
+        
+        示例格式：
+        - Python基础完成70%，已掌握函数和类
+        - 项目部署完成40%，配置好Docker环境
+        - Vue组件开发中，完成3个基础组件
+        """
+    elif is_final:
         prompt = f"""
         用户 {nickname} 的学习情况：
         
@@ -115,7 +140,11 @@ def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str,
             result = response.json()
             ai_feedback = result['choices'][0]['message']['content'].strip()
             
-            # 构建反馈消息
+            # 如果是排名反馈，直接返回生成的内容
+            if is_ranking:
+                return ai_feedback
+            
+            # 构建普通打卡反馈消息
             return f"✨ 打卡成功！\n📝 第 {checkin_count}/21 次打卡\n\n{ai_feedback}"
             
         else:
@@ -123,4 +152,7 @@ def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str,
             
     except Exception as e:
         logger.error(f"生成AI反馈失败: {str(e)}")
-        return f"✅ 打卡成功！\n📊 第 {checkin_count}/21 次打卡\n\n💪 继续加油，期待您的下次分享！"
+        if is_ranking:
+            return "项目进行中，持续推进"
+        else:
+            return f"✅ 打卡成功！\n📊 第 {checkin_count}/21 次打卡\n\n💪 继续加油，期待您的下次分享！"

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import logging
 from app.services.message_handler import MessageHandler
 from app.models.database import init_db, get_db
+from app.services.scheduler import TaskScheduler
 
 # 配置日志
 logging.basicConfig(level=logging.INFO,
@@ -151,15 +152,28 @@ wsClient = lark.ws.Client(
     log_level=lark.LogLevel.DEBUG,
 )
 
+# 创建任务调度器
+task_scheduler = None
+
 
 def main():
     try:
         logger.info("启动飞书机器人服务...")
+        
+        # 初始化并启动任务调度器
+        global task_scheduler
+        task_scheduler = TaskScheduler(client)
+        task_scheduler.start()
+        logger.info("任务调度器已启动")
+        
         #  启动长连接，并注册事件处理器。
         #  Start long connection and register event handler.
         wsClient.start()
     except Exception as e:
         logger.error(f"服务启动失败: {str(e)}")
+        # 如果启动失败，确保关闭调度器
+        if task_scheduler:
+            task_scheduler.stop()
         raise
 
 

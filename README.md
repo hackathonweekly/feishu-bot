@@ -15,12 +15,19 @@
 - AI 智能反馈
 - 打卡统计和进度追踪
 - 自动去重和验证
+- 自动定时排名公布（活动第3、7、14、21天）
 
 ### 3. 智能反馈
 - 基于 DeepSeek API 的智能反馈
 - 考虑历史打卡记录
 - 个性化鼓励和建议
 - 活泼友好的互动风格
+
+### 4. 自动排名功能
+- 在活动第3、7、14、21天晚上9点自动发布
+- 展示打卡次数前10名用户排名
+- 为前5名用户提供项目进度简报
+- 基于实际打卡记录自动统计
 
 ## 技术栈
 
@@ -29,6 +36,7 @@
 - ORM：SQLAlchemy
 - AI 服务：DeepSeek API
 - 消息平台：飞书开放平台
+- 后台任务：自定义线程调度系统
 
 ## 部署步骤
 
@@ -62,6 +70,9 @@ DEEPSEEK_API_ENDPOINT=https://xxxx
 # 飞书配置
 FEISHU_APP_ID=your_app_id
 FEISHU_APP_SECRET=your_app_secret
+
+# 聊天群配置
+DEFAULT_CHAT_ID=oc_xxxxxxxx
 ```
 
 ### 5. 启动服务
@@ -84,6 +95,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000
   - 内容长度：2-500字
   - 频率：每人每天一次
   - 条件：活动进行中且已报名
+
+### 自动功能
+- 排名公布：活动第3、7、14、21天晚上9点自动发布打卡排名
 
 ## 数据库结构
 
@@ -112,7 +126,8 @@ app/
 ├── services/       # 业务逻辑
 │   ├── message_handler.py  # 消息处理
 │   ├── feishu_service.py   # 飞书API
-│   └── openai_service.py   # AI服务
+│   ├── openai_service.py   # AI服务
+│   └── scheduler.py        # 定时任务调度
 └── utils/          # 工具函数
 ```
 
@@ -121,6 +136,7 @@ app/
 - `app/services/message_handler.py`：消息处理核心逻辑
 - `app/services/feishu_service.py`：飞书API交互
 - `app/services/openai_service.py`：AI反馈生成
+- `app/services/scheduler.py`：定时任务调度系统
 
 ## 错误处理
 
@@ -137,6 +153,10 @@ app/
    - 系统已包含消息去重机制
    - 检查日志中的消息ID
 
+4. 排名功能异常
+   - 确保设置了正确的DEFAULT_CHAT_ID
+   - 检查该群是否添加了机器人
+
 ## 日志说明
 
 系统使用分级日志：
@@ -150,6 +170,7 @@ app/
    - 数据库连接状态
    - API 调用额度
    - 日志文件大小
+   - 调度任务运行状态
 
 2. 数据备份
    - 定期备份数据库

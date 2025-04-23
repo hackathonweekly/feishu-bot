@@ -17,6 +17,8 @@ class FeishuService:
     def __init__(self):
         self.app_id = os.getenv("FEISHU_APP_ID")
         self.app_secret = os.getenv("FEISHU_APP_SECRET")
+        # 从环境变量中获取默认聊天群ID
+        self.default_chat_id = os.getenv("DEFAULT_CHAT_ID")
         if not self.app_id or not self.app_secret:
             raise ValueError(
                 "未找到飞书配置信息，请检查环境变量 FEISHU_APP_ID 和 FEISHU_APP_SECRET")
@@ -253,3 +255,20 @@ class FeishuService:
         except Exception as e:
             logger.error(f"获取接龙数据时发生错误: {str(e)}", exc_info=True)
             raise
+
+    def get_chat_id_for_period(self, period_id):
+        """
+        获取指定活动期数的聊天群ID
+        目前简单实现，返回默认聊天群ID
+        未来可扩展为从数据库中查询特定期数对应的聊天群ID
+        """
+        # 这里可以添加从数据库查询期数对应的聊天群ID的逻辑
+        # 例如：根据period_id从数据库中查询对应的chat_id
+        
+        # 目前简单返回默认聊天群ID
+        if self.default_chat_id:
+            logger.info(f"使用默认聊天群ID: {self.default_chat_id}")
+            return self.default_chat_id
+        else:
+            logger.warning("未找到默认聊天群ID，请在环境变量中设置 DEFAULT_CHAT_ID")
+            return None
