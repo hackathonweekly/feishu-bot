@@ -155,4 +155,4 @@ def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str,
         if is_ranking:
             return "项目进行中，持续推进"
         else:
-            return f"✅ 打卡成功！\n📊 第 {checkin_count}/21 次打卡\n\n💪 继续加油，期待您的下次分享！"
+        return f"✅ 打卡成功！\n📊 第 {checkin_count}/21 次打卡\n\n💪 继续加油，期待您的下次分享！"
