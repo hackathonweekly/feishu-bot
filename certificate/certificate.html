@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build In Public 电子奖状</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      min-width: 100vw;
+      background: linear-gradient(180deg, #dbeafe 0%, #f3e8ff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .award-bg {
+      position: absolute;
+      z-index: 0;
+      filter: blur(32px) saturate(1.2);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .blob1 {
+      left: 5vw; top: 10vh; width: 320px; height: 180px;
+      background: radial-gradient(circle at 60% 40%, #a78bfa 0%, #dbeafe 80%, transparent 100%);
+    }
+    .blob2 {
+      right: 0; bottom: 0; width: 340px; height: 180px;
+      background: radial-gradient(circle at 60% 40%, #7c3aed 0%, #f3e8ff 80%, transparent 100%);
+    }
+    .fade-in {
+      animation: fadeIn 1.2s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .award-content {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      min-width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .award-inner {
+      position: relative;
+      width: 100vw;
+      max-width: 1000px;
+      aspect-ratio: 1.43/1;
+      min-width: 320px;
+      min-height: 224px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      margin: auto;
+      background: none;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 0;
+    }
+    @media (max-width: 900px) {
+      .award-inner {
+        max-width: 98vw;
+        min-width: unset;
+      }
+    }
+    @media (max-width: 600px) {
+      .award-inner {
+        max-width: 100vw;
+        min-width: unset;
+        padding: 0 2vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 渐变色块装饰 -->
+  <div class="award-bg blob1"></div>
+  <div class="award-bg blob2"></div>
+  <div class="award-content">
+    <div class="award-inner fade-in">
+      <!-- 标题 -->
+      <div class="w-full text-center mt-10">
+        <h1 class="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-purple-600 to-purple-300 bg-clip-text text-transparent tracking-wide mb-2 select-none">Build In Public 电子奖状</h1>
+        <p id="subtitle" class="text-lg md:text-xl text-gray-700 font-semibold mt-2">奖状说明</p>
+      </div>
+      <!-- 关键信息/正文内容 -->
+      <div class="flex-1 flex flex-col justify-center items-center w-full">
+        <div class="w-full max-w-xl mx-auto text-center">
+          <div id="infoBlock">
+            <div class="text-base md:text-lg text-gray-800 leading-relaxed mb-8" id="defaultDesc">
+              <p>通过公开展示自己的工作进度，获取反馈，提升自我，并与社区成员互相学习。</p>
+              <p>完成活动的参与者将获得定制的电子证书，以表彰他们的努力和贡献。</p>
+              <p>请在左侧选择您参与的活动期数和您的昵称，点击"查询"按钮查看您的证书。</p>
+            </div>
+            <div id="certBlock" style="display:none;">
+              <div class="mb-6">
+                <span class="text-xl md:text-2xl font-bold text-gray-900">获奖者：</span>
+                <span id="nickname" class="text-xl md:text-2xl font-extrabold text-purple-700"></span>
+              </div>
+              <div class="text-base md:text-lg text-gray-800 leading-relaxed mb-8">
+                <p>参与期数：<span id="period" class="font-bold text-purple-700"></span></p>
+                <p id="cerContent"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- LOGO区和日期 -->
+      <div class="w-full flex items-end justify-between px-8 pb-8 mt-4">
+        <div class="flex items-center gap-6">
+          <img src="/certificate/public/img/logo.png" alt="主LOGO" class="w-1/3 h-auto"/>
+        </div>
+        <div class="text-sm text-gray-500 text-right">
+          <div>hackathonweekly 社区</div>
+          <div id="date">2024年4月16日</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // 解析URL参数
+    function getQueryParam(name) {
+      const url = window.location.search;
+      const params = new URLSearchParams(url);
+      return params.get(name);
+    }
+    function showCertificate() {
+      const period = getQueryParam('period');
+      const nickname = getQueryParam('nickname');
+      const cerContent = getQueryParam('cer_content');
+      if (period && nickname && cerContent) {
+        document.getElementById('subtitle').textContent = 'Build In Public 活动证书';
+        document.getElementById('defaultDesc').style.display = 'none';
+        document.getElementById('certBlock').style.display = '';
+        document.getElementById('nickname').textContent = nickname;
+        document.getElementById('period').textContent = period;
+        document.getElementById('cerContent').textContent = cerContent;
+        // 日期自动填充
+        const now = new Date();
+        document.getElementById('date').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+      }
+    }
+    showCertificate();
+  </script>
+</body>
+</html>

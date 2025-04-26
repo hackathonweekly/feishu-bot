@@ -24,6 +24,7 @@ class Period(Base):
 
     signups = relationship(
         "Signup", back_populates="period", cascade="all, delete-orphan")
+    certificates = relationship("Certificate", back_populates="period")
 
 
 class Signup(Base):
@@ -55,6 +56,17 @@ class Checkin(Base):
     checkin_count = Column(Integer)  # 添加打卡次数字段
 
     signup = relationship("Signup", back_populates="checkins")
+
+
+class Certificate(Base):
+    __tablename__ = 'certificate'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    period_id = Column(Integer, ForeignKey('periods.id'))
+    nickname = Column(String(50))
+    cer_content = Column(String(255))
+    
+    period = relationship("Period", back_populates="certificates")
 
 
 # 数据库连接
