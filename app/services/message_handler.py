@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from ..models.database import Period, Signup, Checkin
-from .openai_service import generate_ai_feedback
+from .openai_service import generate_ai_feedback, generate_ai_response
 from .feishu_service import FeishuService
 import os
 import requests
@@ -96,12 +96,28 @@ class MessageHandler:
                 logger.error(f"处理消息时发生错误: {str(e)}")
                 return None
         elif message_type == "text":
-            if message_content.strip() == '#接龙结束':
-                return self.handle_signup_end(chat_id)
-            elif message_content.strip() == '#活动结束':
-                return self.handle_activity_end(chat_id)
-            elif message_content.startswith('#打卡'):
-                return self.handle_checkin(message_content, chat_id)
+            try:
+                # 尝试解析JSON内容
+                content_json = json.loads(message_content)
+                text_content = content_json.get("text", "")
+                
+                # 检查是否包含@机器人的标记
+                if "@_user_" in text_content:
+                    return self.handle_mention(text_content, chat_id)
+                elif message_content.strip() == '#接龙结束':
+                    return self.handle_signup_end(chat_id)
+                elif message_content.strip() == '#活动结束':
+                    return self.handle_activity_end(chat_id)
+                elif message_content.startswith('#打卡'):
+                    return self.handle_checkin(message_content, chat_id)
+                # 添加处理排名指令代码
+                elif message_content.strip() in ['#3天打卡排名公布', '#7天打卡排名公布', '#14天打卡排名公布', '#21天打卡排名公布']:
+                    return self.handle_ranking_publish(message_content, chat_id)
+            except json.JSONDecodeError:
+                # 如果不是JSON格式，直接处理原始文本
+                # 检查是否是@消息
+                if message_content.strip().startswith("@"):
+                    return self.handle_mention(message_content, chat_id)
         return None
 
     def create_new_period(self, chat_id: str, message_content: str) -> str:
@@ -579,3 +595,48 @@ class MessageHandler:
             # 其他错误照常处理
             logger.error(f"处理活动结束时出错: {str(e)}")
             raise e
+
+    def handle_mention(self, message_content: str, chat_id: str) -> str:
+        """处理@机器人的消息"""
+        try:
+            logger.info(f"处理@消息: {message_content}")
+            
+            # 提取@后面的内容
+            # 注意：飞书消息格式可能如 "@机器人 你好"，需要去除前面的@和机器人名称
+            content = message_content.strip()
+            # 如果内容包含空格，取第一个空格后的所有内容作为实际问题
+            if " " in content:
+                actual_content = content.split(" ", 1)[1].strip()
+            else:
+                actual_content = "你好"  # 如果只有@没有其他内容，默认回复
+            
+            logger.info(f"提取的实际内容: {actual_content}")
+            
+            # 使用DeepSeek API生成回复
+            ai_response = generate_ai_response(actual_content)
+            if ai_response:
+                logger.info(f"AI生成回复: {ai_response}")
+                return ai_response
+            else:
+                # 如果AI生成失败，使用预设回复
+                responses = [
+                    f"你好呀！有什么我能帮到你的吗？😊",
+                    f"嗨！我已经准备好为你服务啦！有什么需要帮忙的？✨",
+                    f"很高兴收到你的消息！请问有什么我可以协助你的？🌟"
+                ]
+                response = random.choice(responses)
+                
+                # 添加结束语，增加热情度
+                endings = [
+                    "如果还有其他问题，随时告诉我哦！",
+                    "希望我的回答对你有所帮助！",
+                    "期待与你有更多的交流！"
+                ]
+                response += f"\n\n{random.choice(endings)} 😄"
+                
+                logger.info(f"生成回复: {response}")
+                return response
+            
+        except Exception as e:
+            logger.error(f"处理@消息失败: {str(e)}", exc_info=True)
+            return "抱歉，我好像遇到了点小问题，但我很乐意继续为你服务！请再试一次或换个方式提问吧！🙏"

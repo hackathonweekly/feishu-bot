@@ -156,3 +156,48 @@ def generate_ai_feedback(db: Session, signup_id: int, nickname: str, goals: str,
             return "项目进行中，持续推进"
         else:
             return f"✅ 打卡成功！\n📊 第 {checkin_count}/21 次打卡\n\n💪 继续加油，期待您的下次分享！"
+
+def generate_ai_response(query: str) -> str:
+    """生成AI回复"""
+    try:
+        prompt = f"""
+        用户在飞书群里@了机器人，并发送了以下消息:
+        "{query}"
+        
+        请生成一个热情、有帮助性且不敷衍的回复。回复应该:
+        1. 语气友好活泼
+        2. 内容具体有深度，不泛泛而谈
+        3. 表达对用户问题的理解
+        4. 适当使用emoji增加亲和力
+        5. 整体控制在100字以内
+        """
+        
+        response = http_client.post(
+            DEEPSEEK_API_URL,
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": """你是一个热情友好的飞书助手，喜欢用活泼的语气回答问题，善于理解用户真实需求并给予有价值的回应。"""
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.8,
+                "max_tokens": 200
+            }
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            raise Exception(f"API调用失败: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        logger.error(f"生成AI回复失败: {str(e)}")
+        return None
