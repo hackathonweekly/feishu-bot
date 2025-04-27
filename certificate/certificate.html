@@ -141,7 +141,7 @@
     function showCertificate() {
       const period = getQueryParam('period');
       const nickname = getQueryParam('nickname');
-      const cerContent = getQueryParam('cer_content');
+      const cerContent = getQueryParam('cerContent');
       if (period && nickname && cerContent) {
         document.getElementById('subtitle').textContent = 'Build In Public 活动证书';
         document.getElementById('defaultDesc').style.display = 'none';
@@ -152,6 +152,10 @@
         // 日期自动填充
         const now = new Date();
         document.getElementById('date').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+      } else {
+        // 没有参数时显示默认说明
+        document.getElementById('defaultDesc').style.display = '';
+        document.getElementById('certBlock').style.display = 'none';
       }
     }
     showCertificate();

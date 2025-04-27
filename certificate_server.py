@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import uvicorn
 import os
+from certificate.api.certificate import router as certificate_router
 
 # 创建FastAPI应用
 app = FastAPI(title="活动证书服务")
@@ -21,6 +22,8 @@ async def certificate():
     with open(os.path.join(certificate_dir, "index.html"), "r", encoding="utf-8") as f:
         content = f.read()
     return content
+
+app.include_router(certificate_router)
 
 if __name__ == "__main__":
     print(f"证书服务启动中... 静态文件目录: {certificate_dir}")

@@ -706,13 +706,20 @@
                 try {
                     const response = await fetch('/api/periods/completed');
                     if (response.ok) {
-                        const data = await response.json();
-                        data.forEach(period => {
+                        let data = await response.json();
+                        // 按 id 降序排序（如果后端没保证）
+                        data.sort((a, b) => b.id - a.id);
+                        data.forEach((period, idx) => {
                             const option = document.createElement('option');
                             option.value = period.id;
                             option.textContent = period.period_name;
                             periodSelect.appendChild(option);
                         });
+                        console.log('加载的活动期:', data);
+                        // 默认选中第一项（如果有数据）
+                        if (data.length > 0) {
+                            periodSelect.selectedIndex = 1; // 0是"请选择活动期"
+                        }
                     } else {
                         console.error('Error loading periods:', response.statusText);
                     }
@@ -731,21 +738,33 @@
                     return;
                 }
 
+                // 获取 period_name
+                const periodOption = periodSelect.options[periodSelect.selectedIndex];
+                const periodName = periodOption.textContent;
+
                 try {
-                    const response = await fetch(`/api/certificate?periodId=${periodId}&nickname=${encodeURIComponent(nickname)}`);
+                    const response = await fetch(`/api/certificate?period_id=${periodId}&nickname=${encodeURIComponent(nickname)}`);
                     if (response.ok) {
                         const data = await response.json();
-                        if (data) {
-                            displayCertificate(data);
+                        console.log('cer_content:', data.cer_content);
+                        if (data && data.cer_content) {
+                            // 传递 period、nickname、cerContent 参数给 certificate.html
+                            const params = new URLSearchParams({
+                                period: periodName,
+                                nickname: nickname,
+                                cerContent: data.cer_content
+                            });
+                            document.getElementById('certificateFrame').src = `/certificate/certificate.html?${params.toString()}`;
                         } else {
-                            showError();
+                            alert('未找到证书');
                         }
+                    } else if (response.status === 404) {
+                        alert('未找到证书');
                     } else {
-                        showError();
+                        alert('查询出错');
                     }
                 } catch (error) {
-                    console.error('Error querying certificate:', error);
-                    showError();
+                    alert('查询出错');
                 }
             }
 
