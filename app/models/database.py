@@ -61,9 +61,8 @@ class Checkin(Base):
 class Certificate(Base):
     __tablename__ = 'certificate'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    period_id = Column(Integer, ForeignKey('periods.id'))
-    nickname = Column(String(50))
+    period_id = Column(Integer, ForeignKey('periods.id'), primary_key=True)
+    nickname = Column(String(50), primary_key=True)
     cer_content = Column(String(255))
     
     period = relationship("Period", back_populates="certificates")

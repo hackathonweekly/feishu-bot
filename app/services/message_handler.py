@@ -3,12 +3,13 @@ import re
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from ..models.database import Period, Signup, Checkin
+from ..models.database import Period, Signup, Checkin, Certificate
 from .openai_service import generate_ai_feedback, generate_ai_response
 from .feishu_service import FeishuService
 import os
 import requests
 import time
+import random
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -115,9 +116,20 @@ class MessageHandler:
                     return self.handle_ranking_publish(message_content, chat_id)
             except json.JSONDecodeError:
                 # 如果不是JSON格式，直接处理原始文本
+                message_text = message_content.strip()
                 # 检查是否是@消息
-                if message_content.strip().startswith("@"):
+                if message_text.startswith("@"):
                     return self.handle_mention(message_content, chat_id)
+                # 检查其他指令
+                elif message_text == '#接龙结束':
+                    return self.handle_signup_end(chat_id)
+                elif message_text == '#活动结束':
+                    return self.handle_activity_end(chat_id)
+                elif message_text.startswith('#打卡'):
+                    return self.handle_checkin(message_content, chat_id)
+                # 添加处理排名指令代码
+                elif message_text in ['#3天打卡排名公布', '#7天打卡排名公布', '#14天打卡排名公布', '#21天打卡排名公布']:
+                    return self.handle_ranking_publish(message_content, chat_id)
         return None
 
     def create_new_period(self, chat_id: str, message_content: str) -> str:
@@ -303,12 +315,23 @@ class MessageHandler:
                     focus_area_groups[focus_area].append(dev['nickname'])
                 
                 # 构建响应消息
-                response_lines = ["✨ 本期接龙结束，祝大家开发旅途愉快！\n"]
-                response_lines.append(f"📊 {current_period.period_name}期接龙数据汇总")
-                response_lines.append(f"总参与人数：{total_signups}人\n")
+                response_lines = [
+                    f"✨ {current_period.period_name}期活动圆满结束！",
+                    "感谢大家这段时间的倾情付出与坚持不懈！每一次打卡都见证了我们共同成长的足迹。\n"
+                ]
+                
+                # 修改开发者统计信息部分，加入活动总结感慨
+                response_lines.append("📊 这21天的旅程告诉我们，成长不在于速度，而在于坚持。无论你完成了多少次打卡，每一步都是向目标迈进的珍贵经历。")
+                
+                response_lines.append("🏆 为纪念你在本期的成长历程，我们为每位参与者准备了专属电子证书！")
+                response_lines.append("💫 访问 http://localhost:8000/ 输入你的昵称，即可查看为你量身定制的成长档案，记录你的每一步进步与收获！")
+                
+                # 添加达标情况说明，保持文风一致
+                response_lines.append("\n✨ 在这场技术与毅力的共舞中，我们欣喜地看到许多伙伴坚持到最后，完成了我们设定的挑战：")
+                response_lines.append("🔍 21天内完成7次有效打卡并实现自定目标")
                 
                 # 按专注领域分组显示
-                response_lines.append("🌟 参与者名单：")
+                response_lines.append("\n🌟 参与者名单：")
                 for focus_area, nicknames in focus_area_groups.items():
                     response_lines.append(f"\n{focus_area}：")
                     for nickname in nicknames:
@@ -457,7 +480,7 @@ class MessageHandler:
             self.db.rollback()
             return "❌ 打卡失败，请稍后重试或联系管理员"
 
-    async def handle_activity_end(self, message_id: str) -> str:
+    def handle_activity_end(self, chat_id: str) -> str:
         """处理活动结束"""
         try:
             # 获取当前进行中的活动期数
@@ -517,6 +540,86 @@ class MessageHandler:
                                 retry_count -= 1
                                 if retry_count == 0:
                                     praise = "很棒的表现！期待下次再见！"  # 默认表扬语
+                    
+                    # 构建更详细的证书内容，侧重分析而非简单拼接
+                    if checkin_count > 0:
+                        # 分析用户的目标和进展
+                        progress_percentage = (checkin_count/21*100)
+                        
+                        # 构建更有深度的证书内容
+                        if "前端" in signup.focus_area.lower() or "web" in signup.focus_area.lower():
+                            tech_area = "Web开发领域"
+                        elif "后端" in signup.focus_area.lower() or "java" in signup.focus_area.lower() or "python" in signup.focus_area.lower():
+                            tech_area = "后端开发领域"
+                        elif "运营" in signup.focus_area.lower() or "营销" in signup.focus_area.lower():
+                            tech_area = "运营领域"
+                        elif "设计" in signup.focus_area.lower() or "ui" in signup.focus_area.lower():
+                            tech_area = "设计领域"
+                        elif "算法" in signup.focus_area.lower() or "ai" in signup.focus_area.lower() or "数据" in signup.focus_area.lower():
+                            tech_area = "数据与AI领域"
+                        else:
+                            tech_area = "技术领域"
+                            
+                        # 构建证书内容
+                        cer_content = f"在为期21天的{current_period.period_name}学习活动中，{signup.nickname}在{tech_area}展现出了非凡的学习热情与专注度。"
+                        
+                        # 根据打卡次数生成不同评价
+                        if checkin_count >= 14:
+                            cer_content += f"完成了{checkin_count}/21次打卡，展现出卓越的坚持力与执行力，"
+                        elif checkin_count >= 7:
+                            cer_content += f"完成了{checkin_count}/21次打卡，表现出良好的学习习惯与自律精神，"
+                        else:
+                            cer_content += f"完成了{checkin_count}/21次打卡，迈出了技术成长的重要一步，"
+                        
+                        # 分析用户目标类型
+                        goal_keywords = signup.goals.lower()
+                        if "学习" in goal_keywords or "掌握" in goal_keywords or "了解" in goal_keywords:
+                            goal_type = "技能提升"
+                        elif "开发" in goal_keywords or "完成" in goal_keywords or "实现" in goal_keywords:
+                            goal_type = "项目攻坚"
+                        elif "优化" in goal_keywords or "改进" in goal_keywords:
+                            goal_type = "系统优化"
+                        else:
+                            goal_type = "能力拓展"
+                            
+                        # 继续构建内容
+                        cer_content += f"在{goal_type}方面取得了实质性进展。"
+                        
+                        # 添加AI评语，但不单独标记为"导师评语"
+                        cer_content += f"\n\n{praise}"
+                        
+                        # 达标状态，不提及百分比
+                        if checkin_count >= 7:
+                            cer_content += f"\n\n🏆 恭喜达成本期活动达标要求！你的坚持与成长令人钦佩，期待未来技术之路上继续看到你的身影！"
+                        else:
+                            cer_content += f"\n\n💪 你已迈出了重要的几步！每一次打卡都是成长的见证，期待下一期活动中你的精彩表现！"
+                    else:
+                        cer_content = f"{current_period.period_name}活动期间，{signup.nickname}在{signup.focus_area}领域展现了学习的热情，"
+                        cer_content += "虽然尚未开始打卡记录，但技术成长是一场长期的马拉松。期待在下一次活动中，看到你的精彩表现与持续进步！"
+
+                    # 存储证书数据
+                    try:
+                        # 先检查是否已存在
+                        existing_cert = self.db.query(Certificate).filter(
+                            Certificate.period_id == current_period.id,
+                            Certificate.nickname == signup.nickname
+                        ).first()
+                        
+                        if existing_cert:
+                            # 更新现有记录
+                            existing_cert.cer_content = cer_content
+                            logger.info(f"更新证书数据 - 用户: {signup.nickname}")
+                        else:
+                            # 创建新记录
+                            certificate = Certificate(
+                                period_id=current_period.id,
+                                nickname=signup.nickname,
+                                cer_content=cer_content
+                            )
+                            self.db.add(certificate)
+                            logger.info(f"创建证书数据 - 用户: {signup.nickname}")
+                    except Exception as cert_error:
+                        logger.error(f"存储证书数据失败: {str(cert_error)}", exc_info=True)
                             
                     developer_stats.append({
                         'nickname': signup.nickname,
@@ -537,19 +640,18 @@ class MessageHandler:
                 # 构建响应消息
                 response_lines = [
                     f"✨ {current_period.period_name}期活动圆满结束！",
-                    "感谢大家的积极参与和付出！\n"
+                    "感谢大家这段时间的倾情付出与坚持不懈！每一次打卡都见证了我们共同成长的足迹。\n"
                 ]
                 
-                # 添加开发者统计信息
-                response_lines.append("📊 开发者打卡统计：")
-                for dev in developer_stats:
-                    response_lines.append(f"\n{dev['nickname']} ({dev['focus_area']})：")
-                    response_lines.append(f"- 打卡进度：{dev['checkin_count']}/21次")
-                    response_lines.append(f"- {dev['praise']}")
+                # 修改开发者统计信息部分，加入活动总结感慨
+                response_lines.append("📊 这21天的旅程告诉我们，成长不在于速度，而在于坚持。无论你完成了多少次打卡，每一步都是向目标迈进的珍贵经历。")
                 
-                # 添加达标情况说明
-                response_lines.append("\n🎯 达标情况：")
-                response_lines.append("- 达标要求：21天内完成7次有效打卡 + 实现自定目标")
+                response_lines.append("🏆 为纪念你在本期的成长历程，我们为每位参与者准备了专属电子证书！")
+                response_lines.append("💫 访问 http://localhost:8000/ 输入你的昵称，即可查看为你量身定制的成长档案，记录你的每一步进步与收获！")
+                
+                # 添加达标情况说明，保持文风一致
+                response_lines.append("\n✨ 在这场技术与毅力的共舞中，我们欣喜地看到许多伙伴坚持到最后，完成了我们设定的挑战：")
+                response_lines.append("🔍 21天内完成7次有效打卡并实现自定目标")
                 
                 if qualified_developers:
                     response_lines.append("\n🏆 本期达标开发者：")
@@ -566,17 +668,20 @@ class MessageHandler:
                     "3. 创新项目Demo日展示机会"
                 ])
                 
-                # 对未达标者的简短鼓励
+                # 对未达标者的鼓励，保持与前面一致的文风
                 if len(qualified_developers) < len(developer_stats):
                     response_lines.extend([
-                        "\n💪 未达标的小伙伴也请不要灰心，",
-                        "这只是开始，继续坚持，下期一定能达标！"
+                        "\n💫 致每一位参与者：",
+                        "技术成长是一场漫长的旅程，而非短暂的冲刺。",
+                        "每个人都有自己独特的节奏与步调，而真正的价值在于我们一路积累的思考与坚持。",
+                        "你的每一次打卡，都已在这条路上留下了坚实的足迹。"
                     ])
                 
-                # 更新结束语
+                # 更新结束语，保持文风一致
                 response_lines.extend([
-                    "\n🌈 让我们继续努力，",
-                    "下期再战，更多惊喜奖励等你来挑战！ 🚀"
+                    "\n🌈 感谢每一位用心前行的伙伴！",
+                    "这不是终点，而是新征程的起点。",
+                    "愿我们在技术的星辰大海中继续探索，下期再会！ 🚀"
                 ])
                 
                 return "\n".join(response_lines)
@@ -640,3 +745,184 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"处理@消息失败: {str(e)}", exc_info=True)
             return "抱歉，我好像遇到了点小问题，但我很乐意继续为你服务！请再试一次或换个方式提问吧！🙏"
+
+    def handle_ranking_publish(self, message_content: str, chat_id: str) -> str:
+        """处理打卡排名公布请求"""
+        try:
+            logger.info(f"开始处理打卡排名公布请求: {message_content}")
+            
+            # 提取天数
+            days = None
+            if message_content.strip() == '#3天打卡排名公布':
+                days = 3
+            elif message_content.strip() == '#7天打卡排名公布':
+                days = 7
+            elif message_content.strip() == '#14天打卡排名公布':
+                days = 14
+            elif message_content.strip() == '#21天打卡排名公布':
+                days = 21
+                
+            if not days:
+                return "排名公布失败：无效的天数"
+            
+            # 获取当前进行中的活动期数
+            current_period = self.db.query(Period)\
+                .filter(Period.status == '进行中')\
+                .first()
+                
+            if not current_period:
+                error_msg = "排名公布失败：没有正在进行的活动"
+                logger.info(error_msg)
+                return error_msg
+                
+            # 获取该期所有开发者的报名记录
+            signups = self.db.query(Signup)\
+                .filter(Signup.period_id == current_period.id)\
+                .all()
+                
+            # 收集每个开发者的打卡统计
+            developer_stats = []
+            
+            for signup in signups:
+                # 获取该开发者的所有打卡记录数量
+                checkin_count = self.db.query(Checkin)\
+                    .filter(Checkin.signup_id == signup.id)\
+                    .count()
+                    
+                # 获取开发者的最新打卡记录
+                latest_checkin = self.db.query(Checkin)\
+                    .filter(Checkin.signup_id == signup.id)\
+                    .order_by(Checkin.checkin_date.desc())\
+                    .first()
+                    
+                progress_feedback = ""
+                if latest_checkin and checkin_count > 0:
+                    try:
+                        # 生成进度反馈
+                        progress_feedback = generate_ai_feedback(
+                            db=self.db,
+                            signup_id=signup.id,
+                            nickname=signup.nickname,
+                            goals=signup.goals,
+                            content=latest_checkin.content,
+                            checkin_count=checkin_count,
+                            is_final=False,  # 非最终反馈
+                            is_ranking=True  # 标记这是排名反馈
+                        )
+                        
+                        # 只保留反馈部分
+                        if progress_feedback:
+                            progress_feedback = progress_feedback.split('\n\n')[-1]
+                            
+                            # 更新证书数据 - 改为更有分析深度的内容
+                            try:
+                                # 分析用户的目标和进展
+                                progress_percentage = (checkin_count/21*100)
+                                
+                                # 识别技术领域
+                                if "前端" in signup.focus_area.lower() or "web" in signup.focus_area.lower():
+                                    tech_area = "Web开发领域"
+                                elif "后端" in signup.focus_area.lower() or "java" in signup.focus_area.lower() or "python" in signup.focus_area.lower():
+                                    tech_area = "后端开发领域"
+                                elif "运营" in signup.focus_area.lower() or "营销" in signup.focus_area.lower():
+                                    tech_area = "运营领域"
+                                elif "设计" in signup.focus_area.lower() or "ui" in signup.focus_area.lower():
+                                    tech_area = "设计领域"
+                                elif "算法" in signup.focus_area.lower() or "ai" in signup.focus_area.lower() or "数据" in signup.focus_area.lower():
+                                    tech_area = "数据与AI领域"
+                                else:
+                                    tech_area = "技术领域"
+                                
+                                # 构建证书内容，保持一致的文风且更加简洁
+                                cer_content = f"截至第{days}天，{signup.nickname}在{tech_area}的学习旅程中表现出色。完成了{checkin_count}/21次打卡，"
+                                
+                                # 根据打卡次数生成不同评价
+                                if checkin_count >= 5:
+                                    cer_content += "展现出优秀的学习态度与执行力。"
+                                elif checkin_count >= 3:
+                                    cer_content += "体现了良好的学习节奏与专注度。"
+                                else:
+                                    cer_content += "已迈出了技术进阶的重要一步。"
+                                
+                                # 添加分析，不使用"当前进展"标记
+                                cer_content += f"\n\n{progress_feedback} "
+                                
+                                # 距离达标情况，保持鼓励性
+                                if checkin_count >= 7:
+                                    cer_content += f"你已完成基础达标要求，这份坚持值得赞赏！继续保持这份热情，挑战满勤成就！"
+                                else:
+                                    cer_content += f"继续坚持前行，每一步都在向目标靠近！"
+
+                                # 检查是否已存在证书记录
+                                existing_cert = self.db.query(Certificate).filter(
+                                    Certificate.period_id == current_period.id,
+                                    Certificate.nickname == signup.nickname
+                                ).first()
+                                
+                                if existing_cert:
+                                    # 更新现有记录
+                                    existing_cert.cer_content = cer_content
+                                    logger.info(f"排名中更新证书数据 - 用户: {signup.nickname}")
+                                else:
+                                    # 创建新记录
+                                    certificate = Certificate(
+                                        period_id=current_period.id,
+                                        nickname=signup.nickname,
+                                        cer_content=cer_content
+                                    )
+                                    self.db.add(certificate)
+                                    logger.info(f"排名中创建证书数据 - 用户: {signup.nickname}")
+                                
+                                # 提交证书数据更新
+                                self.db.commit()
+                                
+                            except Exception as cert_error:
+                                logger.error(f"排名中更新证书数据失败: {str(cert_error)}", exc_info=True)
+                                # 回滚证书数据更改，但继续排名处理
+                                self.db.rollback()
+                    except Exception as e:
+                        logger.error(f"生成进度反馈失败: {str(e)}")
+                        progress_feedback = "继续加油！"
+                
+                developer_stats.append({
+                    'nickname': signup.nickname,
+                    'focus_area': signup.focus_area,
+                    'checkin_count': checkin_count,
+                    'progress_feedback': progress_feedback
+                })
+                
+            # 按打卡次数排序（降序）
+            developer_stats.sort(key=lambda x: x['checkin_count'], reverse=True)
+            
+            # 生成排名消息
+            message_lines = [
+                f"✨ {current_period.period_name}期活动第{days}天打卡排行榜",
+                f"📊 截至目前的打卡排名：\n"
+            ]
+            
+            # 添加排名信息
+            for i, dev in enumerate(developer_stats):
+                if i < 10:  # 显示前10名
+                    message_lines.append(f"{i+1}. {dev['nickname']} ({dev['focus_area']}) - {dev['checkin_count']}次打卡")
+                    if i < 5 and dev['progress_feedback']:  # 前5名显示进度反馈
+                        message_lines.append(f"   项目进度: {dev['progress_feedback']}")
+            
+            # 添加证书链接信息
+            message_lines.extend([
+                "\n📝 查看个人证书：",
+                "访问 http://localhost:8000/ 输入昵称即可查看您的进度证书"
+            ])
+            
+            # 添加激励信息
+            message_lines.extend([
+                "\n💪 无论排名如何，坚持才是最大的胜利！",
+                "🌟 记得每天打卡，分享你的进步与收获！",
+                "📝 打卡格式: #打卡 你的昵称 工作内容"
+            ])
+            
+            return "\n".join(message_lines)
+            
+        except Exception as e:
+            error_msg = f"排名公布失败：{str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return "❌ 排名公布失败，请稍后重试或联系管理员"
