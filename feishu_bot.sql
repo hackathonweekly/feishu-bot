@@ -24,6 +24,30 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `feishu_bot` /*!40100 DEFAULT CHARACTER
 USE `feishu_bot`;
 
 --
+-- Table structure for table `certificate`
+--
+
+DROP TABLE IF EXISTS `certificate`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `certificate` (
+  `period_id` int(11) DEFAULT NULL,
+  `nickname` varchar(50) DEFAULT NULL,
+  `cer_content` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `certificate`
+--
+
+LOCK TABLES `certificate` WRITE;
+/*!40000 ALTER TABLE `certificate` DISABLE KEYS */;
+INSERT INTO `certificate` VALUES (1,'测试','哇塞！王五同学迈出了第一步，创建账号啦！? 这可是通往1k粉丝的起点哦！虽然历史打卡还是空白，但今天就是你的“从零到一”时刻！? 继续加油，未来的网红就是你啦！?✨ 期待你的下一次打卡，让我们一起见证你的成长！??'),(1,'李四','在为期21天的2025-04学习活动中，李四在后端开发领域展现出了非凡的学习热情与专注度。完成了1/21次打卡，迈出了技术成长的重要一步，在项目攻坚方面取得了实质性进展。\n\n- ? 开源组件库开发目标刚起步，首次完成市场分析，决定开发生成废话工具，迈出关键第一步！\n\n? 你已迈出了重要的几步！每一次打卡都是成长的见证，期待下一期活动中你的精彩表现！'),(1,'张三','在为期21天的2025-04学习活动中，张三在Web开发领域展现出了非凡的学习热情与专注度。完成了1/21次打卡，迈出了技术成长的重要一步，在项目攻坚方面取得了实质性进展。\n\n- ? 购物网站开发目标刚起步，已用cursor搭建了vue项目，迈出了第一步！\n\n? 你已迈出了重要的几步！每一次打卡都是成长的见证，期待下一期活动中你的精彩表现！'),(1,'王五','在为期21天的2025-04学习活动中，王五在运营领域展现出了非凡的学习热情与专注度。完成了1/21次打卡，迈出了技术成长的重要一步，在能力拓展方面取得了实质性进展。\n\n- ? 1k粉丝量目标刚起步，首个视频火爆，粉丝猛增2.300个，势头强劲！\n\n? 你已迈出了重要的几步！每一次打卡都是成长的见证，期待下一期活动中你的精彩表现！');
+/*!40000 ALTER TABLE `certificate` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `checkins`
 --
 
@@ -41,7 +65,7 @@ CREATE TABLE `checkins` (
   PRIMARY KEY (`id`),
   KEY `fk_checkin_signup` (`signup_id`),
   CONSTRAINT `fk_checkin_signup` FOREIGN KEY (`signup_id`) REFERENCES `signups` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -50,6 +74,7 @@ CREATE TABLE `checkins` (
 
 LOCK TABLES `checkins` WRITE;
 /*!40000 ALTER TABLE `checkins` DISABLE KEYS */;
+INSERT INTO `checkins` VALUES (10,3,'张三','2025-04-27','用cursor搭建了vue项目',1,'2025-04-27 22:09:15'),(11,2,'李四','2025-04-27','做了市场分析决定做一下生成废话的工具',1,'2025-04-27 22:11:15'),(12,4,'王五','2025-04-27','我发了第一个视频，点赞就有快1万了，粉丝一下多了2.300个',1,'2025-04-27 22:12:14');
 /*!40000 ALTER TABLE `checkins` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -85,7 +110,7 @@ CREATE TABLE `periods` (
   `signup_link` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `period_name` (`period_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -94,6 +119,7 @@ CREATE TABLE `periods` (
 
 LOCK TABLES `periods` WRITE;
 /*!40000 ALTER TABLE `periods` DISABLE KEYS */;
+INSERT INTO `periods` VALUES (1,'2025-04','2025-04-24 21:58:21','2025-05-27 21:58:21','已结束','https://hackathonweekly.feishu.cn/base/IFYfbFbG5auTt1s22o7cPWLynmg?ccm_open_type=im_card_automation_link');
 /*!40000 ALTER TABLE `periods` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -115,7 +141,7 @@ CREATE TABLE `signups` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `period_nickname` (`period_id`,`nickname`),
   CONSTRAINT `fk_signup_period` FOREIGN KEY (`period_id`) REFERENCES `periods` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -124,6 +150,7 @@ CREATE TABLE `signups` (
 
 LOCK TABLES `signups` WRITE;
 /*!40000 ALTER TABLE `signups` DISABLE KEYS */;
+INSERT INTO `signups` VALUES (2,1,'李四','java','java开发经验，热爱开源','完成一个开源组件库的开发','2025-04-24 22:02:38'),(3,1,'张三','前端','前端开发经验，热爱开源','完成一个购物网站的开发','2025-04-24 22:02:38'),(4,1,'王五','运营','小红书博主','达到1k粉丝量','2025-04-24 22:02:38');
 /*!40000 ALTER TABLE `signups` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -161,4 +188,4 @@ USE `feishu_bot`;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-04-24 20:47:06
+-- Dump completed on 2025-04-28 22:05:06
