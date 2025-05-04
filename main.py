@@ -71,6 +71,17 @@ def do_p2_im_message_receive_v1(data: P2ImMessageReceiveV1) -> None:
             content_json = json.loads(data.event.message.content)
             res_content = content_json.get("text", "")
             logger.info(f"消息内容: {res_content}")
+            
+            # 处理@提及，将@_user_1这样的key替换为实际的用户名
+            mentions = data.event.message.mentions
+            if mentions:
+                for mention in mentions:
+                    key = mention.key
+                    name = mention.name
+                    logger.info(f"处理@提及: 将 {key} 替换为 {name}")
+                    # 替换消息内容中的key为实际名称
+                    res_content = res_content.replace(key, f"@{name}")
+                logger.info(f"处理@提及后的消息内容: {res_content}")
         else:
             res_content = data.event.message.content
             logger.info(f"消息内容: {res_content}")

@@ -705,10 +705,21 @@ class MessageHandler:
         """处理@机器人的消息"""
         try:
             logger.info(f"处理@消息: {message_content}")
+
+            content = message_content.strip()
+
+            # 判断是否@社区机器人
+            is_mentioned_community_bot = False
+
+            # 检查JSON格式的@消息（通过API发送）
+            if "社区机器人" in content:
+                is_mentioned_community_bot = True
+            else:
+                logger.info("消息@的不是社区机器人，而是其他用户")
+                return None
             
             # 提取@后面的内容
             # 注意：飞书消息格式可能如 "@机器人 你好"，需要去除前面的@和机器人名称
-            content = message_content.strip()
             # 如果内容包含空格，取第一个空格后的所有内容作为实际问题
             if " " in content:
                 actual_content = content.split(" ", 1)[1].strip()
