@@ -91,7 +91,7 @@ class FeishuService:
             raise
 
     def fetch_signup_data(self, signup_link: str) -> List[Dict[str, Any]]:
-        """获取接龙数据"""
+        """获取接龙数据，适配新多维表结构，筛选开发者角色"""
         try:
             logger.info(f"开始获取接龙数据，链接: {signup_link}")
 
@@ -169,83 +169,34 @@ class FeishuService:
                 logger.info(f"获取到 {len(records)} 条记录")
 
                 signup_data = []
-                
                 for record in records:
                     fields = record.get("fields", {})
-                    signup_info = fields.get("接龙信息", "").strip()
-                    logger.info(f"处理接龙信息: {signup_info}")
-
-                    if not signup_info:
+                    # 筛选角色为开发者
+                    role = fields.get("您想做什么角色？", "")
+                    if "开发者" not in str(role):
                         continue
-
-                    # 将接龙信息按行分割
-                    lines = signup_info.split("\n")
-                    if not lines:
-                        continue
-
-                    current_signup = None
-                    for line in lines:
-                        line = line.strip()
-                        if not line:
-                            continue
-
-                        if "-" in line:  # 这是昵称行
-                            # 如果有之前的报名记录，保存它
-                            if current_signup and current_signup["nickname"]:
-                                signup_data.append(current_signup)
-                                current_signup = None
-
-                            # 解析昵称和专注领域
-                            parts = line.split("-")
-                            if len(parts) >= 3:
-                                nickname = parts[0].strip()
-                                # 专注领域在最后一部分
-                                focus_area = parts[-1].strip()
-                                if nickname:
-                                    current_signup = {
-                                        "nickname": nickname,
-                                        "focus_area": focus_area,
-                                        "introduction": "",
-                                        "goals": "",
-                                        "signup_time": datetime.now()
-                                    }
-                                    logger.info(f"创建新的报名记录 - 昵称: {nickname}, 专注领域: {focus_area}")
-                            else:
-                                logger.warning(f"昵称格式不正确: {line}")
-                                nickname = line
-                                focus_area = "未知"
-                                if nickname:
-                                    current_signup = {
-                                        "nickname": nickname,
-                                        "focus_area": focus_area,
-                                        "introduction": "",
-                                        "goals": "",
-                                        "signup_time": datetime.now()
-                                    }
-                                    logger.info(f"创建新的报名记录（格式不正确） - 昵称: {nickname}, 专注领域: {focus_area}")
-                        elif current_signup:
-                            # 处理自我介绍和目标
-                            if "自我介绍：" in line:
-                                current_signup["introduction"] = line.split("自我介绍：")[1].strip()
-                                logger.info(f"添加自我介绍 - 昵称: {current_signup['nickname']}")
-                            elif "本期目标：" in line:
-                                current_signup["goals"] = line.split("本期目标：")[1].strip()
-                                logger.info(f"添加目标 - 昵称: {current_signup['nickname']}")
-
-                    # 添加最后一个报名记录
-                    if current_signup and current_signup["nickname"]:
-                        signup_data.append(current_signup)
-                        logger.info(f"添加最后一条报名记录 - 昵称: {current_signup['nickname']}, 专注领域: {current_signup['focus_area']}")
-
-                logger.info("=== 数据处理结果 ===")
-                for idx, data in enumerate(signup_data, 1):
-                    logger.info(f"处理后的记录 {idx}:")
-                    logger.info(f"昵称: {data['nickname']}")
-                    logger.info(f"专注领域: {data['focus_area']}")
-                    logger.info(f"简介: {data['introduction']}")
-                    logger.info(f"目标: {data['goals']}")
-                    logger.info("---")
-
+                    nickname = fields.get("您的姓名/昵称", "").strip()
+                    focus_area = fields.get("您计划在活动中开发的项目名称", "").strip()
+                    introduction = fields.get("项目简介（100 字以内）", "").strip()
+                    goals = fields.get("预期 21 天内要达成的目标！目标会在社群中公示哦，一起加油！", "").strip()
+                    signup_time = fields.get("提交时间")
+                    # 处理提交时间为datetime对象
+                    if signup_time:
+                        try:
+                            # 飞书多维表一般为ISO格式
+                            signup_time = datetime.fromisoformat(signup_time.replace('Z', '+00:00'))
+                        except Exception:
+                            signup_time = datetime.now()
+                    else:
+                        signup_time = datetime.now()
+                    signup_data.append({
+                        "nickname": nickname,
+                        "focus_area": focus_area,
+                        "introduction": introduction,
+                        "goals": goals,
+                        "signup_time": signup_time
+                    })
+                    logger.info(f"添加报名记录 - 昵称: {nickname}, 项目: {focus_area}, 目标: {goals}")
                 logger.info(f"成功处理 {len(signup_data)} 条报名数据")
                 return signup_data
             else:

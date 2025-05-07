@@ -109,6 +109,8 @@ class MessageHandler:
                     return self.handle_signup_end(chat_id)
                 elif message_content.strip() == '#活动结束':
                     return self.handle_activity_end(chat_id)
+                elif message_content.strip() == '#打卡开始':
+                    return self.handle_checkin_start(chat_id)
                 elif message_content.startswith('#打卡'):
                     return self.handle_checkin(message_content, chat_id)
                 # 添加处理排名指令代码
@@ -125,6 +127,8 @@ class MessageHandler:
                     return self.handle_signup_end(chat_id)
                 elif message_text == '#活动结束':
                     return self.handle_activity_end(chat_id)
+                elif message_text == '#打卡开始':
+                    return self.handle_checkin_start(chat_id)
                 elif message_text.startswith('#打卡'):
                     return self.handle_checkin(message_content, chat_id)
                 # 添加处理排名指令代码
@@ -215,7 +219,7 @@ class MessageHandler:
             return error_msg
 
     def handle_signup_end(self, chat_id: str) -> str:
-        """处理接龙结束命令"""
+        """处理接龙结束命令，适配新多维表结构"""
         try:
             logger.info("开始处理接龙结束命令")
             # 获取当前报名中的活动期数
@@ -234,7 +238,7 @@ class MessageHandler:
                 return error_msg
 
             try:
-                # 从飞书多维表获取数据
+                # 从飞书多维表获取数据（已适配新结构）
                 logger.info(f"开始从多维表获取数据: {current_period.signup_link}")
                 signup_data = self.feishu_service.fetch_signup_data(current_period.signup_link)
                 
@@ -254,10 +258,10 @@ class MessageHandler:
                 developers = []
                 for record in signup_data:
                     try:
-                        # 获取昵称和专注领域
+                        # 直接取新结构字段
                         nickname = record.get('nickname', '').strip()
                         focus_area = record.get('focus_area', '未知').strip()
-                        introduction = record.get('introduction', '').strip()
+                        introduction = record.get('introduction', '').strip()  # 现在为项目介绍
                         goals = record.get('goals', '').strip()
                         signup_time = record.get('signup_time', datetime.now())
 
@@ -265,8 +269,8 @@ class MessageHandler:
                             logger.warning("跳过空昵称的记录")
                             continue
 
-                        logger.info(f"处理报名记录 - 昵称: {nickname}, 专注领域: {focus_area}")
-                        logger.info(f"自我介绍: {introduction}")
+                        logger.info(f"处理报名记录 - 昵称: {nickname}, 项目: {focus_area}")
+                        logger.info(f"项目介绍: {introduction}")
                         logger.info(f"目标: {goals}")
 
                         # 创建新的报名记录
@@ -274,7 +278,7 @@ class MessageHandler:
                             period_id=current_period.id,
                             nickname=nickname,
                             focus_area=focus_area,
-                            introduction=introduction,
+                            introduction=introduction,  # 现在为项目介绍
                             goals=goals,
                             signup_time=signup_time
                         )
@@ -301,7 +305,7 @@ class MessageHandler:
                 # 更新活动状态为已结束
                 current_period.status = '进行中'
                 self.db.commit()
-                logger.info(f"成功更新活动期数 {current_period.period_name} 状态为已结束")
+                logger.info(f"成功更新活动期数 {current_period.period_name} 状态为进行中")
                 logger.info(f"总共处理了 {success_count} 条报名记录")
 
                 # 生成报名统计信息
@@ -446,13 +450,16 @@ class MessageHandler:
                 retry_count = 3  # 最大重试次数
                 ai_feedback = None
                 
+                # 综合目标：项目名称、项目介绍、本期目标
+                combined_goals = f"项目名称：{signup.focus_area}\n项目介绍：{signup.introduction}\n本期目标：{signup.goals}"
+                
                 while retry_count > 0:
                     try:
                         ai_feedback = generate_ai_feedback(
                             db=self.db,
                             signup_id=signup.id,
                             nickname=nickname,
-                            goals=signup.goals,
+                            goals=combined_goals,
                             content=content,
                             checkin_count=len(user_checkins) + 1
                         )
@@ -481,7 +488,7 @@ class MessageHandler:
             return "❌ 打卡失败，请稍后重试或联系管理员"
 
     def handle_activity_end(self, chat_id: str) -> str:
-        """处理活动结束"""
+        """处理活动结束，综合目标为项目名称+项目介绍+本期目标"""
         try:
             # 获取当前进行中的活动期数
             current_period = self.db.query(Period)\
@@ -521,13 +528,15 @@ class MessageHandler:
                         retry_count = 3  # 最大重试次数
                         while retry_count > 0:
                             try:
+                                # 综合目标：项目名称、项目介绍、本期目标
+                                combined_goals = f"项目名称：{signup.focus_area}\n项目介绍：{signup.introduction}\n本期目标：{signup.goals}"
                                 # 使用最后一次打卡内容生成表扬
                                 latest_checkin = checkins[-1]
                                 praise = generate_ai_feedback(
                                     db=self.db,
                                     signup_id=signup.id,
                                     nickname=signup.nickname,
-                                    goals=signup.goals,
+                                    goals=combined_goals,
                                     content=latest_checkin.content,
                                     checkin_count=checkin_count,
                                     is_final=True  # 标记这是结束总结
@@ -572,7 +581,7 @@ class MessageHandler:
                             cer_content += f"完成了{checkin_count}/21次打卡，迈出了技术成长的重要一步，"
                         
                         # 分析用户目标类型
-                        goal_keywords = signup.goals.lower()
+                        goal_keywords = f"{signup.focus_area} {signup.introduction} {signup.goals}".lower()
                         if "学习" in goal_keywords or "掌握" in goal_keywords or "了解" in goal_keywords:
                             goal_type = "技能提升"
                         elif "开发" in goal_keywords or "完成" in goal_keywords or "实现" in goal_keywords:
@@ -809,12 +818,13 @@ class MessageHandler:
                 progress_feedback = ""
                 if latest_checkin and checkin_count > 0:
                     try:
-                        # 生成进度反馈
+                        # 生成进度反馈，综合目标
+                        combined_goals = f"项目名称：{signup.focus_area}\n项目介绍：{signup.introduction}\n本期目标：{signup.goals}"
                         progress_feedback = generate_ai_feedback(
                             db=self.db,
                             signup_id=signup.id,
                             nickname=signup.nickname,
-                            goals=signup.goals,
+                            goals=combined_goals,
                             content=latest_checkin.content,
                             checkin_count=checkin_count,
                             is_final=False,  # 非最终反馈
@@ -937,3 +947,100 @@ class MessageHandler:
             error_msg = f"排名公布失败：{str(e)}"
             logger.error(error_msg, exc_info=True)
             return "❌ 排名公布失败，请稍后重试或联系管理员"
+
+    def handle_checkin_start(self, chat_id: str) -> str:
+        """处理打卡开始指令，欢迎用户参与打卡活动"""
+        try:
+            logger.info("开始处理打卡开始指令")
+            
+            # 获取当前进行中的活动期数
+            current_period = self.db.query(Period)\
+                .filter(Period.status == '进行中')\
+                .first()
+                
+            if not current_period:
+                error_msg = "打卡开始失败：没有正在进行的活动期数"
+                logger.info(error_msg)
+                return error_msg
+                
+            # 获取该期所有开发者的报名记录
+            signups = self.db.query(Signup)\
+                .filter(Signup.period_id == current_period.id)\
+                .all()
+                
+            if not signups:
+                error_msg = "打卡开始失败：未找到任何报名记录"
+                logger.info(error_msg)
+                return error_msg
+            
+            # 收集开发者信息和项目信息
+            developers = []
+            projects = {}
+            
+            for signup in signups:
+                developers.append(signup.nickname)
+                
+                # 整理项目信息，按项目分组
+                if signup.focus_area not in projects:
+                    projects[signup.focus_area] = []
+                projects[signup.focus_area].append({
+                    'nickname': signup.nickname,
+                    'introduction': signup.introduction,
+                    'goals': signup.goals
+                })
+            
+            # 构建欢迎消息
+            message_lines = [
+                f"🚀 {current_period.period_name}期打卡活动正式开始啦！",
+                "欢迎每一位热情的开发者加入我们的21天技术成长挑战！👏\n"
+            ]
+            
+            # 参与者概览
+            message_lines.append(f"📌 本期共有 {len(developers)} 位开发者参与，让我们一起努力实现目标！")
+            message_lines.append("每位开发者都带着精彩的项目和清晰的目标，这将是一场激动人心的技术之旅！\n")
+            
+            # 项目展示
+            message_lines.append("🌟 本期项目概览：")
+            for project_name, members in projects.items():
+                message_lines.append(f"\n📍 {project_name}:")
+                for i, member in enumerate(members, 1):
+                    if i <= 3:  # 每个项目最多展示前3位成员
+                        message_lines.append(f"   👤 {member['nickname']} - {member['introduction'][:30]}{'...' if len(member['introduction']) > 30 else ''}")
+                if len(members) > 3:
+                    message_lines.append(f"   ...以及其他 {len(members)-3} 位开发者")
+            
+            # 打卡规则
+            message_lines.extend([
+                "\n✅ 打卡规则与奖励：",
+                "1️⃣ 打卡格式：#打卡 昵称 今日完成内容",
+                "2️⃣ 21天内完成7次有效打卡即达标",
+                "3️⃣ 达标可获得：专属成长奖状",
+                "4️⃣ 表现优秀者有机会额外奖励"
+            ])
+            
+            # 打卡激励
+            message_lines.extend([
+                "\n💬 不要担心进度比别人慢，重要的是保持前进！",
+                "每一次打卡都是一次成长，每一天的坚持都在塑造更好的自己！",
+                "社区导师将定期为大家提供专业反馈，帮助你更高效地实现目标。"
+            ])
+            
+            # 补充说明链接
+            message_lines.extend([
+                "\n📋 查看详细报名数据与活动指南：",
+                "https://hackathonweekly.feishu.cn/wiki/Q4Pwwk7S8iCl5skmk26cgu4Vnqh"
+            ])
+            
+            # 结束语
+            message_lines.extend([
+                "\n🔥 让我们一起开启这段精彩的技术成长之旅吧！",
+                "每一行代码都是进步，每一次思考都是成长。",
+                "期待看到大家在项目中的精彩表现！加油！💪"
+            ])
+            
+            return "\n".join(message_lines)
+            
+        except Exception as e:
+            error_msg = f"处理打卡开始指令失败：{str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return f"❌ 打卡开始失败，请稍后重试或联系管理员。错误：{str(e)}"
